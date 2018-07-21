@@ -3,7 +3,6 @@ local paths = tArgs[1]
 local mainClass = tArgs[2]
 
 local aloofPath = fs.getDir(shell.getRunningProgram())
-local aloofInstance = {}
 local classes, interfaces = {}, {}
 local metatables = {}
 local loadingClasses, loadingInterfaces = {}, {}
@@ -33,16 +32,7 @@ local classNameFrom = {}
 
 local check = dofile(fs.combine(aloofPath, "check.lua"))
 
-local typeFrom = setmetatable({}, {__mode = "k"})
-local nameFrom = setmetatable({}, {__mode = "k"})
-
 --===== UTILS =====--
-local function printTable(t)
-	for key, value in pairs(t) do
-		print(key, " = ", value)
-	end
-end
-
 local function splitFullName(full_name)
 	return full_name:match("(.*)%.") or "", full_name:match("([^%.]*)$")
 end
@@ -92,9 +82,6 @@ global = {
 				return extendedBy
 			end,
 			Implements = function(proxy, interfaceStaticProxy)
-				if type(interfaceStaticProxy) == "string" then
-					error("HERE", 2)
-				end
 				local interface = interfaceFrom[interfaceStaticProxy]
 				for _, interfaceName in ipairs(classFrom[proxy].implements) do
 					if interfaceName == interface.fullName then
@@ -134,10 +121,7 @@ global = {
 		},
 		setters = {},
 		methods = {
-			InstanceOf = function(proxy, classStaticProxy) -- check - pass in class static proxy and get className from that
-				if type(classStaticProxy) == "string" then
-					error("HERE", 2)
-				end
+			InstanceOf = function(proxy, classStaticProxy)
 				local class = classFrom[classStaticProxy]
 				local className = classFrom[proxy].fullName
 				while className do
@@ -168,12 +152,6 @@ for subObjectType, subObject in pairs(global) do
 end
 
 local function preInit(class, instanceRawProxy, instanceSuperProxy, variables, mainClass, mainInstance, instanceMainProxy)
-
-	typeFrom[instanceRawProxy] = "instanceRawProxy"
-	typeFrom[instanceSuperProxy] = "instanceSuperProxy"
-
-	nameFrom[instanceRawProxy] = class.fullName
-	nameFrom[instanceSuperProxy] = class.fullName
 
 	setmetatable(instanceRawProxy, metatables.instanceRaw)
 	setmetatable(instanceSuperProxy, metatables.instanceSuper)
@@ -1158,54 +1136,6 @@ if not loaderClass then
 end
 loaderClass.environmentProxy = _ENV
 addClass(loaderClass)
---[[
---==============================--
---===== SETUP CLASSES CLASS =====--
---==============================--
-local function get(class)
-end
-local classesClass = {
-	class = "Class",
-	static = {
-		methods = {
-			get = get,
-		},
-	},
-}
-local err
-loaderClass, err = checkLoadedObject(loaderClass)
-if not loaderClass then
-	printError(err)
-	error("could not load the loader!")
-end
-addClass(loaderClass)
-]]
-
-local function getSize(t)
-	local size = 0
-	if next(t) then
-		for key, value in pairs(t) do
-			size = size + 1
-		end
-	end
-	return size
-end
-
-aloofInstance.getCounts = function()
-	return {
-		interfaceFrom = getSize(interfaceFrom),
-		classFrom = getSize(classFrom),
-		staticFrom = getSize(staticFrom),
-		instanceFrom = getSize(instanceFrom),
-		staticRawProxyFrom = getSize(staticRawProxyFrom),
-		instanceRawProxyFrom = getSize(instanceRawProxyFrom),
-		instanceSuperProxyFrom = getSize(instanceSuperProxyFrom),
-		environmentFrom = getSize(environmentFrom),
-	}
-end
-
-environmentFrom[aloofInstance] = mainClassEnvironment
-setmetatable(aloofInstance, metatables.environment)
 
 -- load builtin aloof classes
 loadFrom(fs.combine(aloofPath, "builtin"))
