@@ -259,8 +259,10 @@ metatables = {
 			local value = static.variables[key]
 			if value ~= nil then
 				return (value == NIL and nil) or value
+			elseif static.methods[key] then
+				return error("rawStatic __index: attempt to access static method from raw static - ", tostring(key), 2)
 			else
-				return static.methods[key] or error("rawStatic __index: attempt to get an undefined key - "..tostring(key), 2)
+				return error("rawStatic __index: attempt to get an undefined key - "..tostring(key), 2)
 			end
 		end,
 		__newindex = function(rawProxy, key, value)
