@@ -30,7 +30,8 @@ local instanceSuperProxyFrom = setmetatable({}, {__mode = "k"})
 local environmentFrom = setmetatable({}, {__mode = "k"})
 local classNameFrom = {}
 
-local check = dofile(fs.combine(aloofPath, "check.lua"))
+local environment = dofile(fs.combine(aloofPath, "environment.lua"))
+environment.init(NIL, environmentFrom, mainClassEnvironment, mainEnv)
 
 --===== UTILS =====--
 local function splitFullName(full_name)
@@ -459,12 +460,6 @@ metatables = {
 		end,
 	},
 
-	classEnvironment = {
-		__index = function(proxy, key)
-			return environmentFrom[proxy][key] or mainClassEnvironment[key] or mainEnv[key]
-		end,
-	},
-
 	environment = {
 		__index = function(proxy, key)
 			if not environmentFrom[proxy] then
@@ -501,14 +496,6 @@ local function findFiles(path, files)
 	return files
 end
 
-local function checkLoadedObject(object)
-	local result = {pcall(check.object, object)}
-	if not result[1] then
-		return false, result[2]:match("^[^:]*:[%d]*:(.*)")
-	end
-	return unpack(result, 2)
-end
-
 local function preprocess(data)
 	return data:gsub("super:([%w_]+)%(%s*%)", "super.%1(self)"):gsub("super:([%w_]+)%(%s*", "super.%1(self, ")
 end
@@ -538,15 +525,9 @@ local function loadFile(path)
 	end
 	loadedFiles[path] = true
 
-	local environment = {}
-	
-	local environmentProxy = {
-		NIL = NIL,
-	}
-	environmentFrom[environmentProxy] = environment
-	setmetatable(environmentProxy, metatables.classEnvironment)
+	local env, proxy = environment.new()
 
-	local file, err = loadAndPreprocessFile(path, environmentProxy)
+	local file, err = loadAndPreprocessFile(path, proxy)
 	if file then
 		local ok, err = pcall(file)
 		if not ok then
@@ -560,12 +541,13 @@ local function loadFile(path)
 		return false
 	end
 
-	local object, objectType = checkLoadedObject(environmentProxy)
+	environment.clearTracking(env)
+
+	local object, objectType = environment.check(env, proxy)
 	if object then
-		object.environment = environment
-		object.environmentProxy = environmentProxy
+		object.environment = env
+		object.environmentProxy = proxy
 		if objectType == "class" then
-			--setfenv(object.instance.constructor, object.environmentProxy)
 			if classes[object.fullName] then
 				return printError("error checking file '"..path.."' - ".."class already exists = ", object.fullName)
 			elseif loadingClasses[object.fullName] then
@@ -961,33 +943,35 @@ local function addClass(class)
 	addToMainEnvironment(class)
 end
 
-local function addFromPackage(environment, package)
+local function addFromPackage(env, package)
 	-- add classes in same package
 	for _, class in pairs(classes) do
-		if class.package == package and not environment[class.name] then
-			environment[class.name] = class.staticProxy
+		if class.package == package and not env[class.name] then
+			env[class.name] = class.staticProxy
 		end
 	end
 	-- add interfaces in same package
 	for _, interface in pairs(interfaces) do
-		if interface.package == package and not environment[interface.name] then
-			environment[interface.name] = interface.staticProxy
+		if interface.package == package and not env[interface.name] then
+			env[interface.name] = interface.staticProxy
 		end
 	end
 end
 
 local function addImports(class)
-	local environment = class.environment
-	addFromPackage(environment, class.package)
+	local env = class.environment
+	addFromPackage(env, class.package)
 
 	for _, import in ipairs(class.imports) do
 		local package, name = splitFullName(import)
 		if name == "*" then
-			addFromPackage(environment, package)
+			addFromPackage(env, package)
 		else
 			local object = classes[import] or interfaces[import]
-			if object and not environment[object.name] then
-				environment[object.name] = object.staticProxy
+			if object and not env[object.name] then
+				env[object.name] = object.staticProxy
+			elseif not object then
+				printError("unable to locate object: "..object.name)
 			end
 		end
 	end
@@ -1119,27 +1103,7 @@ function loadFrom(path)
 	return true
 end
 
---==============================--
---===== SETUP LOADER CLASS =====--
---==============================--
-local loaderClass = {
-	class = "Load",
-	static = {
-		methods = {
-			loadFrom = loadFrom,
-		},
-	},
-}
-local err
-loaderClass, err = checkLoadedObject(loaderClass)
-if not loaderClass then
-	printError(err)
-	error("could not load the loader!")
-end
-loaderClass.environmentProxy = _ENV
-addClass(loaderClass)
-
--- load builtin aloof classes
+--===== START LOADING CLASSES =====--
 loadFrom(fs.combine(aloofPath, "builtin"))
 
 for path in string.gmatch(paths, "[^;]+") do
@@ -1156,7 +1120,9 @@ local MainClass = classes[mainClass]
 if MainClass then
 	print("Found Main class")
 	print("Constructing with args = ")
-	print("  ", unpack(tArgs, 3))
+	for i = 3, #tArgs do
+		print("  ", tArgs[i])
+	end
 	local main = MainClass.staticProxy(unpack(tArgs, 3))
 	print("Running Main()")
 	main:Main()

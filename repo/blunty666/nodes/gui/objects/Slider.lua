@@ -64,15 +64,13 @@ local function setLength(slider, length, sendOnChange)
 	updatePosition(slider, percentToPos(length, slider.percent), sendOnChange)
 end
 
-static = {
-	methods = {
-		vertical = function(node, xPos, yPos, order, length)
-			return Slider(node, xPos, yPos, order, length, "VERTICAL")
-		end,
-		horizontal = function(node, xPos, yPos, order, length)
-			return Slider(node, xPos, yPos, order, length, "HORIZONTAL")
-		end
-	},
+static_methods = {
+	vertical = function(node, xPos, yPos, order, length)
+		return Slider(node, xPos, yPos, order, length, "VERTICAL")
+	end,
+	horizontal = function(node, xPos, yPos, order, length)
+		return Slider(node, xPos, yPos, order, length, "HORIZONTAL")
+	end,
 }
 
 variables = {

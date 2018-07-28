@@ -12,15 +12,10 @@ local LEVELS = {
 	"FINEST",
 }
 
-static = {
-	variables = {},
-	methods = {
-		fromIndex = function(index)
-			return LEVELS[index]
-		end,
-	}
-}
+static_method.fromIndex = function(index)
+	return LEVELS[index]
+end
 
 for levelIndex, levelString in ipairs(LEVELS) do
-	static.variables[levelString] = levelIndex
+	static_variable[levelString] = levelIndex
 end

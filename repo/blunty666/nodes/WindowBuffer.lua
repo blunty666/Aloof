@@ -431,8 +431,4 @@ local function new(terminal)
 	
 end
 
-static = {
-	methods = {
-		new = new,
-	},
-}
+static_method.new = new
